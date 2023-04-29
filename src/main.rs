@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use bevy::prelude::*;
 use itertools::Itertools;
 use rand::prelude::*;
@@ -103,12 +104,12 @@ impl FromWorld for Materials {
 
 // part 6
 
-#[derive(Component)]
+#[derive(Component, Debug)]
 struct Points {
     value: u32,
 }
 
-#[derive(Component)]
+#[derive(Component, Debug)]
 struct Position {
     x: u8,
     y: u8,
@@ -215,7 +216,21 @@ impl TryFrom<&KeyCode> for BoardShift {
     }
 }
 
-fn board_shift(input: Res<Input<KeyCode>>) {
+fn board_shift(
+    input: Res<Input<KeyCode>>,
+    mut tiles: Query<(Entity, &mut Position, &mut Points)>
+) {
+    let mut it = tiles.iter_mut().sorted_by(
+        |a, b| {
+            match Ord::cmp(&a.1.y, &b.1.y) {
+                Ordering::Equal => {Ord::cmp(&a.1.x, &b.1.x)}
+                o => o,
+            }
+        }
+    );
+
+    dbg!(it.collect::<Vec<_>>());
+
     let shift_direction = input.get_just_pressed().find_map(
         |key_kode| BoardShift::try_from(key_kode).ok()
     );

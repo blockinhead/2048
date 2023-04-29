@@ -16,6 +16,7 @@ fn main() {
         .add_startup_system(spawn_board)
         .add_startup_system(spawn_tiles.in_base_set(StartupSet::PostStartup))
         .add_system(render_tile_points)
+        .add_system(board_shift)
         .run();
 }
 
@@ -188,5 +189,42 @@ fn render_tile_points(
             let mut text_section = text.sections.first_mut().expect("first sections as mut expected");
             text_section.value = point.value.to_string()
         }
+    }
+}
+
+// part 9
+
+enum BoardShift {
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
+impl TryFrom<&KeyCode> for BoardShift {
+    type Error = &'static str;
+
+    fn try_from(value: &KeyCode) -> Result<Self, Self::Error> {
+        match value {
+            KeyCode::Left => Ok(BoardShift::Left),
+            KeyCode::Up => Ok(BoardShift::Up),
+            KeyCode::Right => Ok(BoardShift::Right),
+            KeyCode::Down => Ok(BoardShift::Down),
+            _ => Err("not a valid key for board shift"),
+        }
+    }
+}
+
+fn board_shift(input: Res<Input<KeyCode>>) {
+    let shift_direction = input.get_just_pressed().find_map(
+        |key_kode| BoardShift::try_from(key_kode).ok()
+    );
+
+    match shift_direction {
+        None => {}
+        Some(BoardShift::Down) => { dbg!("down"); }
+        Some(BoardShift::Right) => { dbg!("right"); }
+        Some(BoardShift::Up) => { dbg!("up"); }
+        Some(BoardShift::Left) => {dbg!("left"); }
     }
 }

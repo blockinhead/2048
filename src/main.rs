@@ -217,19 +217,10 @@ impl TryFrom<&KeyCode> for BoardShift {
 }
 
 fn board_shift(
+    mut commands: Commands,
     input: Res<Input<KeyCode>>,
     mut tiles: Query<(Entity, &mut Position, &mut Points)>
 ) {
-    let mut it = tiles.iter_mut().sorted_by(
-        |a, b| {
-            match Ord::cmp(&a.1.y, &b.1.y) {
-                Ordering::Equal => {Ord::cmp(&a.1.x, &b.1.x)}
-                o => o,
-            }
-        }
-    );
-
-    dbg!(it.collect::<Vec<_>>());
 
     let shift_direction = input.get_just_pressed().find_map(
         |key_kode| BoardShift::try_from(key_kode).ok()
@@ -240,6 +231,39 @@ fn board_shift(
         Some(BoardShift::Down) => { dbg!("down"); }
         Some(BoardShift::Right) => { dbg!("right"); }
         Some(BoardShift::Up) => { dbg!("up"); }
-        Some(BoardShift::Left) => {dbg!("left"); }
+        Some(BoardShift::Left) => {
+            dbg!("left");
+            let mut it = tiles.iter_mut().sorted_by(
+                |a, b| {
+                    match Ord::cmp(&a.1.y, &b.1.y) {
+                        Ordering::Equal => {Ord::cmp(&a.1.x, &b.1.x)}
+                        o => o,
+                    }
+                }
+            ).peekable();
+
+            let mut column: u8 = 0;  // when sliding left, the column of the first sorted tile in any case will be 0
+
+            while let Some(mut tile) = it.next() {
+                tile.1.x = column;
+                match it.peek() {
+                    None => {}
+                    Some(tile_next) => {
+                        if tile.1.y != tile_next.1.y { column = 0; }  // different rows, don't merge
+                        else if tile.2.value != tile_next.2.value { column = column + 1; } // different values don't merge
+                        else {
+                            let real_next_tile = it.next().expect("definitely there is one more"); // one was peeked, so we can take it with next
+                            tile.2.value = tile.2.value + real_next_tile.2.value;
+                            commands.entity(real_next_tile.0).despawn_recursive();
+
+                            if let Some(future) = it.peek() {
+                                if tile.1.y != future.1.y { column = 0; }  // next tile on a next row
+                                else { column = column + 1; }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

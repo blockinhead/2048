@@ -220,54 +220,50 @@ impl TryFrom<&KeyCode> for BoardShift {
 fn board_shift(
     mut commands: Commands,
     input: Res<Input<KeyCode>>,
-    mut tiles: Query<(Entity, &mut Position, &mut Points)>
+    mut tiles: Query<(Entity, &mut Position, &mut Points)>,
+    query_board: Query<&Board>,
 ) {
 
     let shift_direction = input.get_just_pressed().find_map(
         |key_kode| BoardShift::try_from(key_kode).ok()
     );
 
-    match shift_direction {
-        None => {}
-        Some(BoardShift::Down) => { dbg!("down"); }
-        Some(BoardShift::Right) => { dbg!("right"); }
-        Some(BoardShift::Up) => { dbg!("up"); }
-        Some(BoardShift::Left) => {
-            dbg!("left");
-            let mut it = tiles.iter_mut().sorted_by(
-                |a, b| {
-                    match Ord::cmp(&a.1.y, &b.1.y) {
-                        Ordering::Equal => {Ord::cmp(&a.1.x, &b.1.x)}
-                        o => o,
-                    }
+    if shift_direction.is_none() { return; }
+    let board_shift = shift_direction.expect("that cannot be none");
+
+    let board = query_board.get_single().expect("board is expected");
+
+    let mut it = tiles
+        .iter_mut()
+        .sorted_by(|a, b| board_shift.sort(&a.1, &b.1))
+        .peekable();
+
+    let mut column: u8 = 0;  // when sliding left, the column of the first sorted tile in any case will be 0
+
+    while let Some(mut tile) = it.next() {
+        board_shift.set_column_position(board.size, &mut tile.1, column);
+
+        let tile_next = it.peek();
+        if tile_next.is_none() { continue; }
+        let tile_next = tile_next.expect("tile_next is not none");
+
+        if board_shift.get_row_position(&tile.1) != board_shift.get_row_position(&tile_next.1) { column = 0; }  // different rows, don't merge
+        else if tile.2.value != tile_next.2.value { column = column + 1; } // different values don't merge
+        else {
+            let real_next_tile = it.next().expect("definitely there is one more"); // one was peeked, so we can take it with next
+            tile.2.value = tile.2.value + real_next_tile.2.value;
+            commands.entity(real_next_tile.0).despawn_recursive();
+
+            if let Some(future) = it.peek() {
+                if board_shift.get_row_position(&tile.1) != board_shift.get_row_position(&future.1) {
+                    column = 0; // next tile on a next row
                 }
-            ).peekable();
-
-            let mut column: u8 = 0;  // when sliding left, the column of the first sorted tile in any case will be 0
-
-            while let Some(mut tile) = it.next() {
-                tile.1.x = column;
-                match it.peek() {
-                    None => {}
-                    Some(tile_next) => {
-                        if tile.1.y != tile_next.1.y { column = 0; }  // different rows, don't merge
-                        else if tile.2.value != tile_next.2.value { column = column + 1; } // different values don't merge
-                        else {
-                            let real_next_tile = it.next().expect("definitely there is one more"); // one was peeked, so we can take it with next
-                            tile.2.value = tile.2.value + real_next_tile.2.value;
-                            commands.entity(real_next_tile.0).despawn_recursive();
-
-                            if let Some(future) = it.peek() {
-                                if tile.1.y != future.1.y { column = 0; }  // next tile on a next row
-                                else { column = column + 1; }
-                            }
-                        }
-                    }
-                }
+                else { column = column + 1; }
             }
         }
     }
 }
+
 
 // part 12
 
@@ -280,6 +276,55 @@ fn render_tiles(
         if pos_changed {
             transform.translation.x = board.cell_position_to_physical(pos.x);
             transform.translation.y = board.cell_position_to_physical(pos.y);
+        }
+    }
+}
+
+// part 13
+
+impl BoardShift {
+    fn sort(&self, a: &Position, b: &Position) -> Ordering {
+        match self {
+            BoardShift::Left => {
+                match Ord::cmp(&a.y, &b.y) {
+                    Ordering::Equal => { Ord::cmp(&a.x, &b.x) }
+                    o => o,
+                }
+            }
+            BoardShift::Right => {
+                match Ord::cmp(&b.y, &a.y) {
+                    Ordering::Equal => { Ord::cmp(&b.x, &a.x) }
+                    o => o,
+                }
+            }
+            BoardShift::Up => {
+                match Ord::cmp(&b.x, &a.x) {
+                    Ordering::Equal => { Ord::cmp(&b.y, &a.y) }
+                    o => o,
+                }
+            }
+            BoardShift::Down => {
+                match Ord::cmp(&a.x, &b.x) {
+                    Ordering::Equal => { Ord::cmp(&a.y, &b.y) }
+                    o => o,
+                }
+            }
+        }
+    }
+
+    fn set_column_position(&self, board_size: u8, position: &mut Mut<Position>, index: u8) {
+        match self {
+            BoardShift::Left => { position.x = index; }
+            BoardShift::Right => { position.x = board_size - 1 -index; }
+            BoardShift::Up => { position.y = board_size - 1 - index; }
+            BoardShift::Down => { position.y = index; }
+        }
+    }
+
+    fn get_row_position(&self, position: &Position) -> u8 {
+        match self {
+            BoardShift::Left | BoardShift::Right => position.y,
+            BoardShift::Up | BoardShift::Down => position.x,
         }
     }
 }

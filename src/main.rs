@@ -13,6 +13,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .init_resource::<Materials>()
         .init_resource::<FontSpec>()
+        .init_resource::<Game>()
         .add_startup_system(setup)
         .add_startup_system(spawn_board)
         .add_startup_system(spawn_tiles.in_base_set(StartupSet::PostStartup))
@@ -197,6 +198,7 @@ fn board_shift(
     mut tiles: Query<(Entity, &mut Position, &mut Points)>,
     query_board: Query<&Board>,
     mut tile_writer: EventWriter<NewTileEvent>,
+    mut game: ResMut<Game>,
 ) {
 
     let shift_direction = input.get_just_pressed().find_map(
@@ -229,6 +231,7 @@ fn board_shift(
         else {
             let real_next_tile = it.next().expect("definitely there is one more"); // one was peeked, so we can take it with next
             tile.2.value = tile.2.value + real_next_tile.2.value;
+            game.score += tile.2.value;
             commands.entity(real_next_tile.0).despawn_recursive();
 
             if let Some(future) = it.peek() {
@@ -366,4 +369,11 @@ fn spawn_tile(commands: &mut Commands, board: &Board, font_spec: &Res<FontSpec>,
         })
         .insert(Points {value: 2})
         .insert(pos);
+}
+
+// part 14
+
+#[derive(Resource, Default)]
+struct Game {
+    score: u32,
 }

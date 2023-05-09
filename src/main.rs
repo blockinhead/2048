@@ -19,6 +19,8 @@ fn main() {
         .add_system(render_tile_points)
         .add_system(board_shift)
         .add_system(render_tiles)
+        .add_system(new_tile_handler)
+        .add_event::<NewTileEvent>()
         .run();
 }
 
@@ -110,7 +112,7 @@ struct Points {
     value: u32,
 }
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, PartialEq)]
 struct Position {
     x: u8,
     y: u8,
@@ -131,35 +133,7 @@ fn spawn_tiles(
     let starting_tiles = (0..board.size).cartesian_product(0..board.size).choose_multiple(&mut rng, 2);
     for (x, y) in starting_tiles.iter() {
         let pos = Position {x: *x, y: *y};
-        commands.spawn(SpriteBundle {
-            sprite: Sprite {
-                color: TILE_COLOR,
-                custom_size: Some(Vec2::new(TILE_SIZE, TILE_SIZE)),
-                ..default()
-            },
-            transform: Transform::from_xyz(
-                board.cell_position_to_physical(pos.x),
-                board.cell_position_to_physical(pos.y),
-                2.0
-            ),
-            ..default()
-        })
-            .with_children(|child_builder| {
-                child_builder.spawn(Text2dBundle{
-                    text: Text::from_section(
-                        "2",
-                        TextStyle {
-                            font: font_spec.family.clone(),
-                            font_size: 40.0,
-                            color: Color::BLACK,
-                            })
-                        .with_alignment(TextAlignment::Center),
-                    transform: Transform::from_xyz(0.0, 0.0, 2.0),
-                    ..default()
-                }).insert(TileText);
-            })
-            .insert(Points {value: 2})
-            .insert(pos);
+        spawn_tile(&mut commands, board, &font_spec, pos);
     }
 }
 
@@ -222,6 +196,7 @@ fn board_shift(
     input: Res<Input<KeyCode>>,
     mut tiles: Query<(Entity, &mut Position, &mut Points)>,
     query_board: Query<&Board>,
+    mut tile_writer: EventWriter<NewTileEvent>,
 ) {
 
     let shift_direction = input.get_just_pressed().find_map(
@@ -230,6 +205,8 @@ fn board_shift(
 
     if shift_direction.is_none() { return; }
     let board_shift = shift_direction.expect("that cannot be none");
+
+    tile_writer.send(NewTileEvent);
 
     let board = query_board.get_single().expect("board is expected");
 
@@ -327,4 +304,66 @@ impl BoardShift {
             BoardShift::Up | BoardShift::Down => position.x,
         }
     }
+}
+
+// part 14
+
+struct NewTileEvent;
+
+fn new_tile_handler(
+    mut tile_reader: EventReader<NewTileEvent>,
+    mut commands: Commands,
+    query_board: Query<&Board>,
+    tiles: Query<&Position>,
+    font_spec: Res<FontSpec>,
+) {
+    let board = query_board.get_single().expect("board always expected");
+
+    for _event in tile_reader.iter() {  // i dont think that more than one event at a time is possible, but iter will clear the queue
+        let mut rng = rand::thread_rng();
+        let possible_position = (0..board.size).cartesian_product(0..board.size)
+            .filter_map(|tile_pos| {
+                let new_pos = Position{ x: tile_pos.0, y: tile_pos.1 };
+                match tiles.iter().find(|pos| **pos == new_pos) {
+                    None => Some(new_pos),
+                    Some(_) => None
+                }
+            }).choose(&mut rng);
+
+        if let Some(position) = possible_position {
+            spawn_tile(&mut commands, board, &font_spec, position);
+        }
+    }
+}
+
+fn spawn_tile(commands: &mut Commands, board: &Board, font_spec: &Res<FontSpec>, pos: Position) {
+    commands.spawn(SpriteBundle {
+        sprite: Sprite {
+            color: TILE_COLOR,
+            custom_size: Some(Vec2::new(TILE_SIZE, TILE_SIZE)),
+            ..default()
+        },
+        transform: Transform::from_xyz(
+            board.cell_position_to_physical(pos.x),
+            board.cell_position_to_physical(pos.y),
+            2.0
+        ),
+        ..default()
+    })
+        .with_children(|child_builder| {
+            child_builder.spawn(Text2dBundle{
+                text: Text::from_section(
+                    "2",
+                    TextStyle {
+                        font: font_spec.family.clone(),
+                        font_size: 40.0,
+                        color: Color::BLACK,
+                    })
+                    .with_alignment(TextAlignment::Center),
+                transform: Transform::from_xyz(0.0, 0.0, 2.0),
+                ..default()
+            }).insert(TileText);
+        })
+        .insert(Points {value: 2})
+        .insert(pos);
 }

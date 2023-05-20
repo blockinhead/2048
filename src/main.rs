@@ -3,6 +3,9 @@ use bevy::prelude::*;
 use itertools::Itertools;
 use rand::prelude::*;
 
+mod ui;
+use ui::*;
+
 const BOARD_COLOR: Color = Color::rgb(0.7, 0.7, 0.8);
 const TILE_PLACEHOLDER_COLOR: Color = Color::rgb(0.75, 0.75, 0.9);
 const TILE_COLOR: Color = Color::WHITE;
@@ -11,6 +14,7 @@ const TILE_COLOR: Color = Color::WHITE;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
+        .add_plugin(GameUiPlugin)
         .init_resource::<Materials>()
         .init_resource::<FontSpec>()
         .init_resource::<Game>()

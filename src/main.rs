@@ -22,12 +22,13 @@ fn main() {
         .add_startup_system(setup)
         .add_startup_system(spawn_board)
         .add_startup_system(spawn_tiles.in_base_set(StartupSet::PostStartup))
-        .add_system(render_tile_points)
-        .add_system(board_shift)
-        .add_system(render_tiles)
-        .add_system(new_tile_handler)
-        .add_system(end_game)
         .add_event::<NewTileEvent>()
+        .add_state::<RunState>()
+        .add_system(render_tile_points.in_set(OnUpdate(RunState::Playing)))
+        .add_system(board_shift.in_set(OnUpdate(RunState::Playing)))
+        .add_system(render_tiles.in_set(OnUpdate(RunState::Playing)))
+        .add_system(new_tile_handler.in_set(OnUpdate(RunState::Playing)))
+        .add_system(end_game.in_set(OnUpdate(RunState::Playing)))
         .run();
 }
 
@@ -385,7 +386,11 @@ struct Game {
 }
 
 //part 18
-fn end_game(tiles: Query<(&Position, &Points)>, query_board: Query<&Board>) {
+fn end_game(
+    tiles: Query<(&Position, &Points)>,
+    query_board: Query<&Board>,
+    mut state: ResMut<NextState<RunState>>
+) {
     let board = query_board.get_single().expect("no board - no game");
 
     if tiles.iter().len() < (board.size * board.size).into() {
@@ -411,5 +416,15 @@ fn end_game(tiles: Query<(&Position, &Points)>, query_board: Query<&Board>) {
 
     if has_move == false {
         dbg!("game over");
+        state.set(RunState::GameOver);
     }
+}
+
+
+//part 19
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
+enum RunState {
+    #[default]
+    Playing,
+    GameOver,
 }

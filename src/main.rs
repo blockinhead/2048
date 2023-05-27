@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 use itertools::Itertools;
 use rand::prelude::*;
+use bevy_easings::*;
 
 mod ui;
 use ui::*;
@@ -16,6 +17,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugin(GameUiPlugin)
+        .add_plugin(EasingsPlugin)
         .init_resource::<Materials>()
         .init_resource::<FontSpec>()
         .init_resource::<Game>()
@@ -258,15 +260,19 @@ fn board_shift(
 // part 12
 
 fn render_tiles(
-    mut tiles: Query<(&mut Transform, &Position, Changed<Position>)>,
+    mut commands: Commands,
+    mut tiles: Query<(Entity, &Transform, &Position), Changed<Position>>,
     query_board: Query<&Board>,
 ) {
     let board = query_board.get_single().expect("board is expected");
-    for (mut transform, pos, pos_changed) in tiles.iter_mut() {
-        if pos_changed {
-            transform.translation.x = board.cell_position_to_physical(pos.x);
-            transform.translation.y = board.cell_position_to_physical(pos.y);
-        }
+    for (entity, transform, pos) in tiles.iter_mut() {
+        let x = board.cell_position_to_physical(pos.x);
+        let y = board.cell_position_to_physical(pos.y);
+        commands.entity(entity).insert(transform.ease_to(
+            Transform::from_xyz(x, y, transform.translation.z),
+            EaseFunction::QuadraticInOut,
+            EasingType::Once { duration: std::time::Duration::from_millis(100) }
+        ));
     }
 }
 

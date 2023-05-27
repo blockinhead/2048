@@ -21,14 +21,16 @@ fn main() {
         .init_resource::<Game>()
         .add_startup_system(setup)
         .add_startup_system(spawn_board)
-        .add_startup_system(spawn_tiles.in_base_set(StartupSet::PostStartup))
         .add_event::<NewTileEvent>()
         .add_state::<RunState>()
-        .add_system(render_tile_points.in_set(OnUpdate(RunState::Playing)))
-        .add_system(board_shift.in_set(OnUpdate(RunState::Playing)))
-        .add_system(render_tiles.in_set(OnUpdate(RunState::Playing)))
-        .add_system(new_tile_handler.in_set(OnUpdate(RunState::Playing)))
-        .add_system(end_game.in_set(OnUpdate(RunState::Playing)))
+        .add_systems(
+            (game_reset, spawn_tiles).chain()
+            .in_schedule(OnEnter(RunState::Playing))
+        )
+        .add_systems(
+            (render_tile_points, board_shift, render_tiles, new_tile_handler, end_game)
+            .in_set(OnUpdate(RunState::Playing)),
+        )
         .run();
 }
 
@@ -422,9 +424,23 @@ fn end_game(
 
 
 //part 19
-#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
+#[derive(States, Debug, Clone, Copy, Default, Eq, PartialEq, Hash)]
 enum RunState {
     #[default]
     Playing,
     GameOver,
+}
+
+
+// part 21
+fn game_reset(
+    mut commands: Commands,
+    tiles: Query<Entity, With<Position>>,
+    mut game: ResMut<Game>,
+) {
+    for entity in tiles.iter() {
+        commands.entity(entity).despawn_recursive();
+    }
+
+    game.score = 0;
 }

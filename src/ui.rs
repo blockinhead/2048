@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::{FontSpec, Game};
+use crate::{FontSpec, Game, RunState};
 
 
 #[derive(Component)]
@@ -13,7 +13,9 @@ pub struct GameUiPlugin;
 impl Plugin for GameUiPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup_ui)
-            .add_system(scoreboard);
+            .add_system(scoreboard)
+            .add_system(button_interaction_system)
+            .add_system(button_text_system);
     }
 }
 
@@ -62,6 +64,7 @@ fn setup_ui (mut commands: Commands, font_spec: Res<FontSpec>) {
                        padding: UiRect::all(Val::Px(10.0)),
                        ..default()
                    },
+                   background_color: NORMAL_BUTTON.into(),
                    ..default()
                 }).with_children(|parent| {
                     parent.spawn(TextBundle {
@@ -94,6 +97,7 @@ fn setup_ui (mut commands: Commands, font_spec: Res<FontSpec>) {
                         padding: UiRect::all(Val::Px(10.0)),
                         ..default()
                     },
+                    background_color: NORMAL_BUTTON.into(),
                     ..default()
                 }).with_children(|parent| {
                     parent.spawn(TextBundle {
@@ -151,3 +155,43 @@ fn scoreboard(game: Res<Game>, mut query_score: Query<&mut Text, With<ScoreDispl
     text.sections[0].value = game.score.to_string();
 }
 
+// part 20
+const NORMAL_BUTTON: Color = Color::rgb(0.75, 0.75, 0.9);
+const HOVERED_BUTTON: Color = Color::rgb(0.7, 0.7, 0.9);
+const PRESSED_BUTTON: Color = Color::rgb(0.6, 0.6, 0.95);
+
+fn button_interaction_system(
+    mut interaction_query: Query<
+        (&Interaction, &mut BackgroundColor),
+        (Changed<Interaction>, With<Button>)
+    >,
+    run_state: Res<State<RunState>>,
+    mut next_state: ResMut<NextState<RunState>>,
+) {
+    for (interaction, mut background_color) in interaction_query.iter_mut() {
+        match *interaction {
+            Interaction::Clicked => {
+                *background_color = PRESSED_BUTTON.into();
+                match run_state.0 {
+                    RunState::Playing => { next_state.set(RunState::GameOver); }
+                    RunState::GameOver => { next_state.set(RunState::Playing); }
+                }
+            }
+            Interaction::Hovered => { *background_color = HOVERED_BUTTON.into(); }
+            Interaction::None => { *background_color = NORMAL_BUTTON.into(); }
+        }
+    }
+}
+
+fn button_text_system(
+    button_query: Query<&Children, With<Button>>,
+    mut text_query: Query<&mut Text>,
+    run_state: Res<State<RunState>>,
+) {
+    let children = button_query.single();
+    let mut text = text_query.get_mut(*children.first().expect("button is to have only one child")).unwrap();
+    match run_state.0 {
+        RunState::Playing => { text.sections[0].value = "End Game".to_string(); }
+        RunState::GameOver => { text.sections[0].value = "New Game".to_string(); }
+    }
+}

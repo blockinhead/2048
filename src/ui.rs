@@ -150,9 +150,12 @@ fn setup_ui (mut commands: Commands, font_spec: Res<FontSpec>) {
 
 //part 17
 
-fn scoreboard(game: Res<Game>, mut query_score: Query<&mut Text, With<ScoreDisplay>>) {
-    let mut text = query_score.single_mut();
-    text.sections[0].value = game.score.to_string();
+fn scoreboard(
+    game: Res<Game>,
+    mut query_score: ParamSet<(Query<&mut Text, With<ScoreDisplay>>, Query<&mut Text, With<BestScoreDisplay>>)>) {
+
+    query_score.p0().single_mut().sections[0].value = game.score.to_string();
+    query_score.p1().single_mut().sections[0].value = game.score_best.to_string();
 }
 
 // part 20

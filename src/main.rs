@@ -241,6 +241,7 @@ fn board_shift(
             let real_next_tile = it.next().expect("definitely there is one more"); // one was peeked, so we can take it with next
             tile.2.value = tile.2.value + real_next_tile.2.value;
             game.score += tile.2.value;
+            if game.score_best <  game.score { game.score_best = game.score; }
             commands.entity(real_next_tile.0).despawn_recursive();
 
             if let Some(future) = it.peek() {
@@ -385,6 +386,7 @@ fn spawn_tile(commands: &mut Commands, board: &Board, font_spec: &Res<FontSpec>,
 #[derive(Resource, Default)]
 struct Game {
     score: u32,
+    score_best: u32,
 }
 
 //part 18
